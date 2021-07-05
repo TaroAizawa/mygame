@@ -20,7 +20,6 @@ class App:
         pyxel.init(self.size_x, self.size_y, caption="test!", scale=5, fps=30, quit_key=pyxel.KEY_ESCAPE, fullscreen=True)
         pyxel.load("test.pyxres")
         self.player = Player()
-        self.wall = Wall()
         self.chaser = Chaser(50, 50, 8)
         self.flag = Flag()
         pyxel.run(self.update, self.draw)
@@ -163,31 +162,6 @@ class Flag:
         self.gameover = False
         self.gameclear = False
 
-class Effects:
-    """
-    効果全般
-    """
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.count = 0
-        self.r = 10
-    
-    def bomb(self, x, y):
-        if self.count == 8:
-            self.count = 0
-        self.count += 1
-
-class Wall:
-    def __init__(self):
-        # 点群の座標
-        self.points = np.array([[20, 20], [230, 20], [230, 230], [20, 230]])
-
-    def hit_check(self, tar_x, tar_y):
-        """
-        対象との当たり判定。
-        """
-        pass
 
 def main():
     App()

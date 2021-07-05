@@ -21,11 +21,12 @@ class App:
 
     def update(self):
         self.pointer.check(self.size_x, self.size_y, self.system_screen.h)
+        self.system_screen.update_system()
         self.mouseL_last = self.mouseL_now
         self.mouseR_lase = self.mouseR_now
         self.mouseL_now = pyxel.btn(pyxel.MOUSE_LEFT_BUTTON)
         self.mouseR_now = pyxel.btn(pyxel.MOUSE_RIGHT_BUTTON)
-        if self.mouseL_last == False and self.mouseL_now == True:
+        if self.pointer.mouseL_last == False and self.pointer.mouseL_now == True:
             self.lines.add_point(self.pointer)
         if self.mouseR_lase == False and self.mouseR_now == True and len(self.lines.points)>=2:
             self.lines.active = False
@@ -34,18 +35,23 @@ class App:
 
     def draw(self):
         pyxel.cls(0)
-        self.system_screen.draw()
+        self.system_screen.draw_system()
         self.pointer.draw_pointer()
         self.lines.draw_lines(self.pointer)
         self.wall.draw_wall(self.pointer)
-        pyxel.text(10, 74, f"mouse_x:{pyxel.mouse_x}\nmouse_y:{pyxel.mouse_y}\nmouseL_now:{self.mouseL_now}\nmouseL_last:{self.mouseL_last}\nwall.points:{self.wall.wall}", 8)
+        pyxel.text(10, 74, f"mouse_x:{pyxel.mouse_x}\nmouse_y:{pyxel.mouse_y}\npointer.mouseL_now:{self.pointer.mouseL_now}\npointer.mouseL_last:{self.pointer.mouseL_last}\nwall.points:{self.wall.wall}", 8)
+        pyxel.text(158, 45, f"Press mouse_R button or\nselect other drawing to\ndetermine this drawing.", 0)
+
 
 class Pointer:
     def __init__(self):
         self.x = pyxel.mouse_x
         self.y = pyxel.mouse_y
+        self.mouseL_now = False
+        self.mouseL_last = False
     
     def check(self, size_x, size_y, system_height):
+        self.mouseL_last = self.mouseL_now
         if pyxel.mouse_x < 0:
             self.x = 0
         elif pyxel.mouse_x > size_x:
@@ -61,12 +67,16 @@ class Pointer:
         
         if 0<=pyxel.mouse_x<size_x and system_height<=pyxel.mouse_y<size_y:
             pyxel.mouse(False)
+            if pyxel.btn(pyxel.MOUSE_LEFT_BUTTON):
+                self.mouseL_now = True
+            else:
+                self.mouseL_now = False
         else:
+            self.mouseL_now = False
             pyxel.mouse(True)
 
-    
     def draw_pointer(self):
-        if pyxel.btn(pyxel.MOUSE_LEFT_BUTTON):
+        if self.mouseL_now:
             pyxel.blt(self.x-2, self.y-2, 0, 8, 0, 5, 5, 0)
         else:
             pyxel.blt(self.x-2, self.y-2, 0, 0, 0, 5, 5, 0)
@@ -88,8 +98,6 @@ class Lines:
             (self.points[-2][0] != pointer.x and self.points[-2][1] != pointer.y))):
             self.points = np.vstack([self.points, np.array([[pointer.x, pointer.y]])])
         
-
-    
     def draw_lines(self, pointer):
         """構成する全ての線の描画
         """
@@ -134,9 +142,15 @@ class SystemScreen:
         self.y = y
         self.w = w
         self.h = h
+        self.button = Button(10, 10, 10, 10)
     
-    def draw(self):
+    def update_system(self):
+        self.button.check_hover()
+
+    def draw_system(self):
         pyxel.rect(self.x, self.y, self.w, self.h, 8)
+        pyxel.rect(self.button.x, self.button.y, self.button.w, self.button.h, 10)
+        pyxel.text(10, 20, f"button_switch:{self.button.switch_on}", 10)
 
 
 class Button:
@@ -146,19 +160,23 @@ class Button:
         self.w = w
         self.h = h
         self.hover = False
+        self.switch_on = False
 
-    def check_hover(self, tar):
+    def check_hover(self):
         if (self.x<=pyxel.mouse_x<self.x+self.w and 
             self.y<=pyxel.mouse_y<self.y+self.y):
             self.hover = True
         else:
             self.hover = False
-        
-        if self.hover and tar:
-            pass
+        if self.hover and pyxel.btnp(pyxel.MOUSE_LEFT_BUTTON):
+            if self.switch_on == False:
+                self.switch_on = True
+            else:
+                self.off_switch()
 
-    def aaa(self):
-        pass
+    def off_switch(self):
+        self.switch_on = False
+
         
 
 if __name__ == "__main__":
