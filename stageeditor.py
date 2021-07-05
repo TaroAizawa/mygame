@@ -81,8 +81,14 @@ class Lines:
     def add_point(self, pointer):
         if len(self.points) == 0:
             self.points = np.array([[pointer.x, pointer.y]]) 
-        else:
+        elif len(self.points) == 1 and self.points[-1][0] != pointer.x and self.points[-1][1] != pointer.y:
             self.points = np.vstack([self.points, np.array([[pointer.x, pointer.y]])])
+        elif (len(self.points) >= 2 and 
+            ((self.points[-1][0] != pointer.x and self.points[-1][1] != pointer.y)and
+            (self.points[-2][0] != pointer.x and self.points[-2][1] != pointer.y))):
+            self.points = np.vstack([self.points, np.array([[pointer.x, pointer.y]])])
+        
+
     
     def draw_lines(self, pointer):
         """構成する全ての線の描画
