@@ -4,42 +4,133 @@ import pyxel
 import numpy as np
 import math
 
+# 場面の定義
+TITLE = 0
+STAGE_SELECT = 1
+STAGE = 2
+
 class App():
     def __init__(self):
         # pyxelの初期設定
+        self.scene = STAGE_SELECT
+        self.scene_last = TITLE
         self.size_x = 256
         self.size_y = 256
         pyxel.init(self.size_x, self.size_y, caption="Test of hit-check : lines", scale=5, fps=30, quit_key=pyxel.KEY_ESCAPE, fullscreen=True)
         pyxel.load("foreditor.pyxres")
-        # 各オブジェクト生成
-        self.pointer = Pointer()
-        self.player = Player(150, 170, 8)
-        self.chaser = Chaser(50, 50, 8)
-        self.wall = Wall([[np.array([[8, 71], [11, 244], [243, 256], [241, 76], [119, 123]]), True],
-                          [np.array([[36, 129], [35, 229], [219, 225], [220, 118], [117, 159]]), True]])
-        self.flag = Flag()
         # pyxel起動
         pyxel.run(self.update, self.draw)
 
     def update(self):
-        # 各オブジェクトの処理
-        self.flag.reset()
-        self.pointer.update_pointer(0, 0, self.size_x, self.size_y)
-        self.chaser.set_new_vector(self.player.x, self.player.y, pyxel.frame_count)
-        self.player.update_player(self.pointer.x, self.pointer.y)
-        self.chaser.hit_check(self.player.r, self.player.coord_last, self.player.coord_now)
-        self.chaser.set_new_coords()
-        self.wall.hit_check(np.array([self.player.x, self.player.y]), self.player.r)
-        # ゲームオーバー判定
-        self.flag.check_gameover(self.wall.hit, self.chaser.hit)
+        if self.scene == TITLE:
+            if self.scene_last != TITLE:
+                self.title = Title()
+            self.title.update_title()
+            self.scene_last = TITLE
+        if self.scene == STAGE_SELECT:
+            if self.scene_last != STAGE_SELECT:
+                self.stage_select = StageSelect(self.size_x, self.size_y, 1)
+            self.stage_select.update_stage_select()
+            self.scene_last = STAGE_SELECT
+            if not self.stage_select.activate:
+                del(self.stage_select)
+                self.scene = STAGE
+        if self.scene == STAGE:
+            if self.scene_last == STAGE_SELECT:
+                self.stage = Stage(self.size_x, self.size_y, pyxel.frame_count,
+                           [220, 220, 10], 
+                           [50, 50, 8],
+                           [[np.array([[6, 69], [9, 248], [65, 245], [59, 128], [78, 129], [82, 242], [190, 237], [187, 130], [197, 129], [203, 244], [247, 247], [241, 74], [145, 73], [148, 197], [128, 198], [120, 70]]), True]])
+            self.stage.update_Stage()
+            self.scene_last = STAGE
+            if not self.stage.activate:
+                del(self.stage)
+                self.scene = STAGE_SELECT
+
 
     def draw(self):
         pyxel.cls(0)
+        if self.scene == TITLE:
+            self.title.draw_title()
+        if self.scene == STAGE_SELECT:
+            self.stage_select.draw_stage_select()            
+        if self.scene == STAGE:        
+            self.stage.draw_Stage()
+        pyxel.text(10, 50, f"scene:{self.scene}", 8)
+        
+
+
+class Title:
+    def __init__(self):
+        pass
+    def update_title(self):
+        pass
+    def draw_title(self):
+        pyxel.crs(0)
+
+
+class StageSelect:
+    def __init__(self, size_x, size_y, stages):
+        self.size_x = size_x
+        self.size_y = size_y
+        self.stages = stages
+        self.pointer = Pointer()
+        self.activete = True
+    
+    def update_stage_select(self):
+        self.pointer.update_pointer(0, 0, self.size_x, self.size_y)
+        if pyxel.btnp(pyxel.MOUSE_LEFT_BUTTON):
+            self.activate = False
+
+    def draw_stage_select(self):
+        pyxel.cls(0)
         self.pointer.draw_pointer()
-        self.player.draw_player()
-        self.chaser.draw_chaser()
-        self.wall.draw_wall()
-        pyxel.text(10, 20, f"Game Over : {self.flag.gameover}", 8)
+
+class Stage:
+    def __init__(self, size_x, size_y, frame_start, player_arg, chaser_arg, wall_arg):
+        # 各オブジェクト生成
+        self.frame_start = frame_start
+        self.frame = 0
+        self.draw_next_frame = True
+        self.update_next_frame = True
+        self.activate = True
+        self.size_x = size_x
+        self.size_y = size_y
+        self.pointer = Pointer()
+        self.player = Player(player_arg[0], player_arg[1], player_arg[2])
+        self.chaser = Chaser(chaser_arg[0], chaser_arg[1], chaser_arg[2])
+        self.wall = Wall(wall_arg, [self.player.x, self.player.y])
+        self.flag = Flag()
+    
+    def update_Stage(self):
+        # 各オブジェクトの処理
+        self.frame = pyxel.frame_count - self.frame_start
+        self.flag.reset()
+        if self.update_next_frame:
+            self.pointer.update_pointer(0, 0, self.size_x, self.size_y)
+            self.chaser.set_new_vector(self.player.x, self.player.y, pyxel.frame_count)
+            self.player.update_player(self.pointer.x, self.pointer.y)
+            self.chaser.hit_check(self.player.r, self.player.coord_last, self.player.coord_now)
+            self.chaser.set_new_coords()
+            self.wall.hit_check(np.array([self.player.x, self.player.y]), self.player.r)
+            # ゲームオーバー判定
+            self.flag.check_gameover(self.wall.hit, self.chaser.hit)
+        # ゲームオーバーの時の処理
+        if self.flag.gameover:
+            self.activate = False
+            self.update_next_frame = False
+        # （テスト用）右クリックで復活させる
+        if pyxel.btnp(pyxel.MOUSE_RIGHT_BUTTON):
+            self.update_next_frame = True
+
+    def draw_Stage(self):
+        pyxel.cls(0)
+        if self.draw_next_frame:
+            self.pointer.draw_pointer()
+            self.player.draw_player()
+            self.chaser.draw_chaser()
+            self.wall.draw_wall()
+        pyxel.text(10, 20, f"Game Over : {self.flag.gameover}\nGame Activate:{self.update_next_frame}", 8)
 
 
 class Pointer:
@@ -99,6 +190,7 @@ class Player:
             self.x = x
             self.y = y
         self.coord_now = np.array([self.x, self.y])
+        # 自分がクリックされたら
         if (np.linalg.norm(np.array([x-self.x, y-self.y]), ord=2)<=self.r and 
             pyxel.btnp(pyxel.MOUSE_LEFT_BUTTON)):
             self.follow = True
@@ -197,19 +289,22 @@ class Chaser:
         pyxel.circ(self.x, self.y, self.r, self.color)
         if self.color == 8:
             pyxel.circb(self.x, self.y, self.r, 10)
-        pyxel.text(10, 30, f"hit_chaser:{self.hit}", 8)
 
 
 class OneLine:
     """当たり判定機能を持った一本の線
     """
-    def __init__(self, start, end):
+    def __init__(self, start, end, tar_coord):
         self.start = start  # 始点座標
         self.end = end      # 終点座標
         self.color = 5
         self.hit = False
-        self.cross_now = 0
-        self.cross_last = 0
+        self.vec_start2end = np.array(self.end-self.start)     # ベクトル：始点->終点
+        self.vec_start2tar = np.array(tar_coord-self.start)    # ベクトル：始点->相手
+        self.vec_end2tar = np.array(tar_coord-self.end)        # ベクトル：終点->相手
+        self.cross_now = np.cross(self.vec_start2end / np.linalg.norm(self.vec_start2end, ord=2), 
+                                self.vec_start2tar)            # 始点->相手の単位ベクトルと始点->終点ベクトルとの外積(符号付きの高さ) 
+        self.cross_last = self.cross_now
 
     def hit_check(self, tar_coord, tar_r):
         """相手を円と見たときの当たり判定
@@ -232,7 +327,7 @@ class OneLine:
             ((self.cross_now < 0) != (self.cross_last < 0))):
             self.hit = True
         self.cross_last = self.cross_now
-    
+
     def check_over90(self, A, B):
         """hit_check内で使う判定
 
@@ -259,7 +354,7 @@ class OneLine:
 class Lines:
     """線の集まりを包括管理
     """
-    def __init__(self, args):
+    def __init__(self, args, tar_coord):
         """コンストラクタ
 
         リストに線オブジェクトがそれぞれ格納される。
@@ -272,9 +367,9 @@ class Lines:
         self.hit_of_lines = np.array([])
         for index, point in enumerate(self.points):
             if index < len(self.points)-1:
-                self.lines.append(OneLine(point, self.points[index+1]))
+                self.lines.append(OneLine(point, self.points[index+1], tar_coord))
             elif self.close == True:
-                self.lines.append(OneLine(point, self.points[0]))
+                self.lines.append(OneLine(point, self.points[0], tar_coord))
             self.hit_of_lines = np.append(self.hit_of_lines, False)
     
     def hit_check(self, tar_coord, tar_r):
@@ -304,7 +399,7 @@ class Wall:
     """線の集まり　の集まりを包括管理
     
     """
-    def __init__(self, args):
+    def __init__(self, args, tar_coord):
         """コンストラクタ
 
         リストに線の集まりオブジェクトがそれぞれ格納される。
@@ -314,7 +409,7 @@ class Wall:
         self.hit_of_lines = np.array([]) 
         self.wall = np.array([])
         for lines in args:
-            self.wall = np.append(self.wall, Lines(lines))
+            self.wall = np.append(self.wall, Lines(lines, tar_coord))
             self.hit_of_lines = np.append(self.hit_of_lines, False)
     
     def hit_check(self, tar_coord, tar_r):
@@ -335,16 +430,15 @@ class Wall:
         """
         for lines in self.wall:
             lines.draw_lines()
-        pyxel.text(10, 10, f"hit_wall:{self.hit}", 8)
 
 
 class Flag:
-    """ゲーム進行上のフラグを管理
+    """ステージ進行上のフラグを管理
     """
     def __init__(self):
         """各種フラグの初期化
         """
-        self.gameover = False
+        self.reset()
 
     def check_gameover(self, *args):
         """ゲームオーバーの判定
@@ -354,10 +448,15 @@ class Flag:
         if any(args):
             self.gameover = True
     
+    def check_crear(self, *args):
+        if any(args):
+            self.gamecrear = True
+
     def reset(self):
         """各種フラグを初期値に戻す。
         """
         self.gameover = False
+        self.gamecrear = False
 
             
 if __name__ == "__main__":

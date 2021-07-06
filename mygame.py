@@ -21,7 +21,6 @@ class App:
         pyxel.load("test.pyxres")
         self.player = Player()
         self.chaser = Chaser(50, 50, 8)
-        self.flag = Flag()
         pyxel.run(self.update, self.draw)
 
     def update(self):
@@ -37,9 +36,6 @@ class App:
         if self.chaser.dxy < self.player.r+self.chaser.r:
             self.flag.gameover = True
         self.chaser.set_new_coords()
-        if self.flag.gameover == True:
-            self.flag.gameover = False
-            pyxel.quit()
         # Qキーで終了
         if pyxel.btnp(pyxel.KEY_Q):
             pyxel.quit()
