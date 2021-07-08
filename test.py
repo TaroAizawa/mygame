@@ -4,30 +4,40 @@ import pyxel
 import numpy as np
 import math
 
-# 場面の定義
+# 場面の定義：アプリ
 TITLE = 0
 STAGE_SELECT = 1
 STAGE = 2
 
+# 場面の定義：ステージ
+BEFORE_START = 0
+START = 1
+GAMEOVER = 2
+GAMECLEAR = 3
+
 class App():
     def __init__(self):
         # pyxelの初期設定
-        self.scene = STAGE_SELECT
-        self.scene_last = TITLE
+        self.scene = STAGE
+        self.scene_last = STAGE_SELECT
+        self.secected_stage_setting = None
         self.size_x = 256
         self.size_y = 256
-        pyxel.init(self.size_x, self.size_y, caption="Test of hit-check : lines", scale=5, fps=30, quit_key=pyxel.KEY_ESCAPE, fullscreen=True)
+        self.fps = 30
+        pyxel.init(self.size_x, self.size_y, caption="IRAIRA-CHASE", scale=5, fps=self.fps, quit_key=pyxel.KEY_ESCAPE, fullscreen=True)
         pyxel.load("foreditor.pyxres")
         # pyxel起動
         pyxel.run(self.update, self.draw)
 
     def update(self):
+        # ===== タイトル画面 =====
         if self.scene == TITLE:
             if self.scene_last != TITLE:
                 self.title = Title()
             self.title.update_title()
             self.scene_last = TITLE
-        if self.scene == STAGE_SELECT:
+        # ===== ステージセレクト画面 =====
+        elif self.scene == STAGE_SELECT:
             if self.scene_last != STAGE_SELECT:
                 self.stage_select = StageSelect(self.size_x, self.size_y, 1)
             self.stage_select.update_stage_select()
@@ -35,30 +45,36 @@ class App():
             if not self.stage_select.activate:
                 del(self.stage_select)
                 self.scene = STAGE
-        if self.scene == STAGE:
+        # ===== ステージ =====
+        elif self.scene == STAGE:
             if self.scene_last == STAGE_SELECT:
-                self.stage = Stage(self.size_x, self.size_y, pyxel.frame_count,
-                           [220, 220, 10], 
+                self.stage = Stage(self.size_x, self.size_y,
+                           [220, 220, 12], 
                            [50, 50, 8],
                            [[np.array([[6, 69], [9, 248], [65, 245], [59, 128], [78, 129], [82, 242], [190, 237], [187, 130], [197, 129], [203, 244], [247, 247], [241, 74], [145, 73], [148, 197], [128, 198], [120, 70]]), True]])
+                self.stage.set_frame0()
             self.stage.update_Stage()
-            self.scene_last = STAGE
             if not self.stage.activate:
                 del(self.stage)
                 self.scene = STAGE_SELECT
-
+            self.scene_last = STAGE
+            
 
     def draw(self):
         pyxel.cls(0)
+        # ===== タイトル画面 =====
         if self.scene == TITLE:
-            self.title.draw_title()
-        if self.scene == STAGE_SELECT:
-            self.stage_select.draw_stage_select()            
-        if self.scene == STAGE:        
-            self.stage.draw_Stage()
+            if self.scene_last == TITLE:
+                self.title.draw_title()
+        # ===== ステージセレクト画面 =====
+        elif self.scene == STAGE_SELECT:
+            if self.scene_last == STAGE_SELECT:
+                self.stage_select.draw_stage_select()
+        # ===== ステージ =====          
+        elif self.scene == STAGE:
+            if self.scene_last == STAGE:        
+                self.stage.draw_Stage()
         pyxel.text(10, 50, f"scene:{self.scene}", 8)
-        
-
 
 class Title:
     def __init__(self):
@@ -75,7 +91,7 @@ class StageSelect:
         self.size_y = size_y
         self.stages = stages
         self.pointer = Pointer()
-        self.activete = True
+        self.activate = True
     
     def update_stage_select(self):
         self.pointer.update_pointer(0, 0, self.size_x, self.size_y)
@@ -85,52 +101,136 @@ class StageSelect:
     def draw_stage_select(self):
         pyxel.cls(0)
         self.pointer.draw_pointer()
+        pyxel.text(100, 125, "This screen if stage select\n\npress mouse-L\nto restart", 10)
+
 
 class Stage:
-    def __init__(self, size_x, size_y, frame_start, player_arg, chaser_arg, wall_arg):
+    def __init__(self, size_x, size_y, player_arg, chaser_arg, wall_arg):
         # 各オブジェクト生成
-        self.frame_start = frame_start
-        self.frame = 0
-        self.draw_next_frame = True
-        self.update_next_frame = True
-        self.activate = True
+        self.args_init = {"player_arg":player_arg, "chaser_arg":chaser_arg, "wall_arg":wall_arg}
+        self.scene = BEFORE_START
+        self.scene_last = GAMEOVER
+        self.activate = True    # ゲームを動かすか？（終わっていないか？）
+        self.stop = False       # 更新処理をスキップして止めるか？
         self.size_x = size_x
         self.size_y = size_y
         self.pointer = Pointer()
         self.player = Player(player_arg[0], player_arg[1], player_arg[2])
-        self.chaser = Chaser(chaser_arg[0], chaser_arg[1], chaser_arg[2])
+        if chaser_arg != None:
+            self.chaser = Chaser(chaser_arg[0], chaser_arg[1], chaser_arg[2])
         self.wall = Wall(wall_arg, [self.player.x, self.player.y])
         self.flag = Flag()
     
-    def update_Stage(self):
-        # 各オブジェクトの処理
-        self.frame = pyxel.frame_count - self.frame_start
+    def reset_stage(self):
+        player_arg = self.args_init["player_arg"]
+        wall_arg = self.args_init["wall_arg"]
+        if self.args_init["chaser_arg"] != None:
+            chaser_arg = self.args_init["chaser_arg"]
+            self.chaser = Chaser(chaser_arg[0], chaser_arg[1], chaser_arg[2])
+        self.player = Player(player_arg[0], player_arg[1], player_arg[2])
+        self.wall = Wall(wall_arg, [self.player.x, self.player.y])
         self.flag.reset()
-        if self.update_next_frame:
-            self.pointer.update_pointer(0, 0, self.size_x, self.size_y)
-            self.chaser.set_new_vector(self.player.x, self.player.y, pyxel.frame_count)
+    
+    def set_frame0(self):
+        """ステージ開始時に呼び出し、フレームの開始点を決める
+        """
+        self.frame0 = pyxel.frame_count
+        self.frame = 0
+    
+    def update_Stage(self):
+        # ポインターは場面に関わらず更新
+        self.pointer.update_pointer(0, 0, self.size_x, self.size_y)
+        # ===== スタート前 =====
+        if self.scene == BEFORE_START:
             self.player.update_player(self.pointer.x, self.pointer.y)
-            self.chaser.hit_check(self.player.r, self.player.coord_last, self.player.coord_now)
+            # プレイヤーがクリックされてfollowが切り替わったら次フレームからゲーム開始
+            if self.player.follow == True:
+                self.scene = START
+            # 直前の場面を更新
+            self.scene_last = BEFORE_START
+        # ===== ゲーム開始 =====
+        elif self.scene == START:
+            # 場面切り替え後最初のフレームだけ行うもの
+            if self.scene_last == BEFORE_START:
+                self.set_frame0()
+            # スタートからの経過フレーム更新
+            self.frame = pyxel.frame_count - self.frame0
+            # 各オブジェクトの更新処理
+            self.player.update_player(self.pointer.x, self.pointer.y)
+            self.chaser.set_new_vector(self.player.x, self.player.y, pyxel.frame_count)
             self.chaser.set_new_coords()
+            # ヒットチェック
+            self.chaser.hit_check(self.player.r, self.player.coord_last, self.player.coord_now)
             self.wall.hit_check(np.array([self.player.x, self.player.y]), self.player.r)
-            # ゲームオーバー判定
+            # 判定（ゲームオーバーorクリア）
             self.flag.check_gameover(self.wall.hit, self.chaser.hit)
-        # ゲームオーバーの時の処理
-        if self.flag.gameover:
-            self.activate = False
-            self.update_next_frame = False
+            if self.flag.gameover:
+                self.scene = GAMEOVER
+            if self.flag.gamecrear:
+                self.scene = GAMECLEAR
+            # 直前の場面を更新
+            self.scene_last = START
+        # ===== ゲームオーバー =====
+        elif self.scene == GAMEOVER:
+            # 場面切り替え後最初のフレームだけ行うもの
+            if self.scene_last == START:
+                pass
+            # 直前の場面を更新
+            self.scene_last = GAMEOVER
+        # ===== ゲームクリア =====
+        elif self.scene == GAMECLEAR:
+            # 場面切り替え後最初のフレームだけ行うもの
+            if self.scene_last == START:
+                pass
+            # 直前の場面を更新
+            self.scene_last = GAMECLEAR
         # （テスト用）右クリックで復活させる
-        if pyxel.btnp(pyxel.MOUSE_RIGHT_BUTTON):
-            self.update_next_frame = True
+        if self.scene == GAMEOVER or self.scene == GAMECLEAR:
+            if pyxel.btnp(pyxel.MOUSE_RIGHT_BUTTON):
+                self.reset_stage()
+                self.set_frame0()
+                self.scene = BEFORE_START
+            elif pyxel.btnp(pyxel.MOUSE_LEFT_BUTTON):
+                self.activate = False
 
     def draw_Stage(self):
+        # 画面を色0でクリア
         pyxel.cls(0)
-        if self.draw_next_frame:
-            self.pointer.draw_pointer()
-            self.player.draw_player()
-            self.chaser.draw_chaser()
-            self.wall.draw_wall()
-        pyxel.text(10, 20, f"Game Over : {self.flag.gameover}\nGame Activate:{self.update_next_frame}", 8)
+        # 各オブジェクトの描画
+        self.pointer.draw_pointer()
+        self.player.draw_player()
+        self.chaser.draw_chaser()
+        self.wall.draw_wall()
+        # ゲームオーバー時のみ描画するもの
+        if self.scene == GAMEOVER:
+            pyxel.text(pyxel.text(80, 125, "GAME OVER\n\npress mouse-R : restart\npress mousr_L : go to stage select", 10))
+        # ゲームクリア時のみ描画するもの
+        elif self.scene == GAMECLEAR:
+            pass
+        m = int(self.frame/30/60)
+        s = int((self.frame-(m*30*60))/30)
+        frame = self.frame - m*30*60 - s*30
+
+        pyxel.text(10, 20, f"frame:{m}:{s}:{frame}\n({self.frame} = pyxel.frame_count:{pyxel.frame_count} - frame0:{self.frame0})\nGame Over : {self.flag.gameover}\nGame Activate:{self.activate}", 8)
+
+class Counter:
+    def __init__(self, count):
+        self.count_init = count
+        self.count = count
+        self.now = 0
+        self.end = False
+    
+    def increment_count(self):
+        self.now += 0
+        if self.now >= self.count:
+            self.end = True
+    
+    def reset_count(self):
+        self.count = self.count_init
+        self.now = 0
+        self.end = False
+
+
 
 
 class Pointer:
@@ -214,13 +314,15 @@ class Chaser:
         self.movable = True
         self.color = 8
         self.hit = False
+        self.stop = False
 
     def set_new_coords(self):
         """
         速度を足して座標更新。
         """
-        self.x += self.vx
-        self.y += self.vy
+        if not self.stop:
+            self.x += self.vx
+            self.y += self.vy
     
     def set_new_vector(self, tar_x, tar_y, frame_count):
         """
@@ -286,9 +388,12 @@ class Chaser:
             return False
     
     def draw_chaser(self):
-        pyxel.circ(self.x, self.y, self.r, self.color)
-        if self.color == 8:
-            pyxel.circb(self.x, self.y, self.r, 10)
+        if not self.stop:
+            pyxel.circ(self.x, self.y, self.r, self.color)
+            if self.color == 8:
+                pyxel.circb(self.x, self.y, self.r, 10)
+        else:
+            pyxel.circ(self.x, self.y, self.r, 5)
 
 
 class OneLine:
@@ -448,7 +553,7 @@ class Flag:
         if any(args):
             self.gameover = True
     
-    def check_crear(self, *args):
+    def check_clear(self, *args):
         if any(args):
             self.gamecrear = True
 
@@ -457,6 +562,52 @@ class Flag:
         """
         self.gameover = False
         self.gamecrear = False
+
+# 直近では実装しない
+""" class Effects:
+    def __init__(self):
+        pass
+    def update_effects(self):
+        pass
+    def draw_effects(self):
+        pass
+
+class Bubbles:
+    def __init__(self, tar_x, tar_y):
+        self.bubbles = []      
+
+class Bubble:
+    def __init__(self, x, y, r, v, rad, vx, vy, a):
+        self.x = x
+        self.y = y
+        self.r = r
+        self.v = v
+        self.rad = rad
+        self.vx = vx
+        self.vy = vy
+        self.a = a
+
+    def set_new_coords(self):
+        self.x += self.vx
+        self.y += self.vy
+
+    def set_new_vector(self, x, y, w, h):
+        if self.vx > 0 and self.x > x+w:
+            self.vx *= -1
+        if self.vx < 0 and self.x < x:
+            self.vx *= -1
+        if self.vy > 0 and self.y > y+h:
+            self.vy *= -1
+        if self.vy < 0 and self.y < y:
+            self.vy *= -1
+        self.vx *= self.a
+        self.vy *= self.a
+        self.a -= 0.5
+
+    def draw_bubble(self):
+        pyxel.circb(self.x, self.y, self.r, 10) """
+
+    
 
             
 if __name__ == "__main__":
