@@ -76,6 +76,7 @@ class App():
                 self.stage.draw_Stage()
         pyxel.text(10, 50, f"scene:{self.scene}", 8)
 
+
 class Title:
     def __init__(self):
         pass
@@ -165,6 +166,8 @@ class Stage:
             # 判定（ゲームオーバーorクリア）
             self.flag.check_gameover(self.wall.hit, self.chaser.hit)
             if self.flag.gameover:
+                self.player.show = False
+                self.bubbles = Bubbles(self.player.x, self.player.y, 10)
                 self.scene = GAMEOVER
             if self.flag.gamecrear:
                 self.scene = GAMECLEAR
@@ -175,6 +178,7 @@ class Stage:
             # 場面切り替え後最初のフレームだけ行うもの
             if self.scene_last == START:
                 pass
+            self.bubbles.update_bubbles()
             # 直前の場面を更新
             self.scene_last = GAMEOVER
         # ===== ゲームクリア =====
@@ -203,14 +207,16 @@ class Stage:
         self.wall.draw_wall()
         # ゲームオーバー時のみ描画するもの
         if self.scene == GAMEOVER:
-            pyxel.text(pyxel.text(80, 125, "GAME OVER\n\npress mouse-R : restart\npress mousr_L : go to stage select", 10))
+            if self.scene_last == START:
+                pyxel.rect(0, 0, self.size_x, self.size_y, 7)
+            pyxel.text(80, 125, "GAME OVER\n\npress mouse-R : restart\npress mousr_L : go to stage select", 10)
+            self.bubbles.draw_bubbles()
         # ゲームクリア時のみ描画するもの
         elif self.scene == GAMECLEAR:
             pass
         m = int(self.frame/30/60)
         s = int((self.frame-(m*30*60))/30)
         frame = self.frame - m*30*60 - s*30
-
         pyxel.text(10, 20, f"frame:{m}:{s}:{frame}\n({self.frame} = pyxel.frame_count:{pyxel.frame_count} - frame0:{self.frame0})\nGame Over : {self.flag.gameover}\nGame Activate:{self.activate}", 8)
 
 class Counter:
@@ -229,8 +235,6 @@ class Counter:
         self.count = self.count_init
         self.now = 0
         self.end = False
-
-
 
 
 class Pointer:
@@ -260,7 +264,7 @@ class Pointer:
 
     def draw_pointer(self):
         if self.visible:
-            if pyxel.btn(pyxel.MOUSE_LEFT_BUTTON):
+            if pyxel.btn(pyxel.MOUSE_LEFT_BUTTON) or pyxel.btn(pyxel.MOUSE_RIGHT_BUTTON):
                 pyxel.blt(self.x-2, self.y-2, 0, 8, 0, 5, 5, 0)
             else:
                 pyxel.blt(self.x-2, self.y-2, 0, 0, 0, 5, 5, 0)
@@ -281,6 +285,7 @@ class Player:
         self.coord_now = np.array([self.x, self.y])
         self.coord_last = self.coord_now
         self.follow = False
+        self.show = True
 
     def update_player(self, x, y):
         """自身の座標の更新
@@ -298,9 +303,10 @@ class Player:
     def draw_player(self):
         """自身を円として描画
         """
-        pyxel.circb(self.x, self.y, self.r, 10)
-        pyxel.line(self.coord_last[0], self.coord_last[1], 
-                    self.coord_now[0], self.coord_now[1], 10)
+        if self.show:
+            pyxel.circb(self.x, self.y, self.r, 10)
+            pyxel.line(self.coord_last[0], self.coord_last[1], 
+                        self.coord_now[0], self.coord_now[1], 10)
 
 
 class Chaser:
@@ -554,6 +560,10 @@ class Flag:
             self.gameover = True
     
     def check_clear(self, *args):
+        """ゲームクリアの判定
+        判定に使用したいbool値をすべて渡して, 
+        いずれかがTrueならゲームクリアのフラグをTrueにする
+        """      
         if any(args):
             self.gamecrear = True
 
@@ -563,51 +573,63 @@ class Flag:
         self.gameover = False
         self.gamecrear = False
 
-# 直近では実装しない
-""" class Effects:
-    def __init__(self):
-        pass
-    def update_effects(self):
-        pass
-    def draw_effects(self):
-        pass
 
 class Bubbles:
-    def __init__(self, tar_x, tar_y):
-        self.bubbles = []      
+    def __init__(self, tar_x, tar_y, num):
+        self.bubbles = []
+        pi = np.pi
+        self.num = num
+        for i in range(self.num):
+            self.bubbles.append(Bubble(tar_x, tar_y, 8, 10, pi*2/self.num*i, 0.9))
+
+    def update_bubbles(self):
+        for i in range(self.num):
+            self.bubbles[i].update_bubble()
+
+    def draw_bubbles(self):
+        for i in range(self.num):
+            self.bubbles[i].draw_bubble()
+
 
 class Bubble:
-    def __init__(self, x, y, r, v, rad, vx, vy, a):
-        self.x = x
-        self.y = y
+    def __init__(self, x, y, r, v, rad, a):
+        self.coord = np.array([x, y])
         self.r = r
-        self.v = v
+        self.v_sca = v
         self.rad = rad
-        self.vx = vx
-        self.vy = vy
+        self.v_init = np.array([math.cos(rad), math.sin(rad)])
         self.a = a
 
-    def set_new_coords(self):
-        self.x += self.vx
-        self.y += self.vy
-
-    def set_new_vector(self, x, y, w, h):
-        if self.vx > 0 and self.x > x+w:
-            self.vx *= -1
-        if self.vx < 0 and self.x < x:
-            self.vx *= -1
-        if self.vy > 0 and self.y > y+h:
-            self.vy *= -1
-        if self.vy < 0 and self.y < y:
-            self.vy *= -1
-        self.vx *= self.a
-        self.vy *= self.a
-        self.a -= 0.5
+    def update_bubble(self):
+        pi = np.pi
+        v_rad = pi/36
+        self.coord = self.coord + self.v_init*self.v_sca
+        self.v_sca *= self.a
+        self.v_init = np.dot(np.array([[np.cos(v_rad), -np.sin(v_rad)],[np.sin(v_rad), np.cos(v_rad)]]), self.v_init)
+        self.r -= 0.2
 
     def draw_bubble(self):
-        pyxel.circb(self.x, self.y, self.r, 10) """
+        pyxel.circb(self.coord[0], self.coord[1], self.r, 10)
 
+
+class WaitTimer:
+    def __init__(self, count, step=1):
+        self.args_init = [count, step, False]
+        self.count = count
+        self.step = step
+        self.end = False
     
+    def update_wait_timer(self):
+        self.count -= self.step
+        if self.count <= 0:
+            self.count = 0
+            self.end = True
+
+    def reset(self):
+        self.count = self.args_init[0]
+        self.step = self.args_init[1]
+        self.end = self.args_init[2]
+
 
             
 if __name__ == "__main__":
