@@ -1,4 +1,6 @@
 .venv
 .vscode
 pyxel_examples
+test.py
+test.pyxres
 __pycache__

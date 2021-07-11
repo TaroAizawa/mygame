@@ -1,4 +1,3 @@
-from mygame import Player
 import pyxel
 import numpy as np
 
@@ -8,27 +7,19 @@ class App:
         self.size_y = 256
         self.system_screen = SystemScreen(0, 0, self.size_x, 64)
         pyxel.init(self.size_x, self.size_y, caption="test!", scale=5, fps=30, quit_key=pyxel.KEY_ESCAPE, fullscreen=True)
-        pyxel.load("foreditor.pyxres")
+        pyxel.load("for_mygame.pyxres")
         pyxel.mouse(True)
         self.pointer = Pointer()
         self.lines = Lines(True)
         self.wall = Wall()
-        self.mouseL_now = False
-        self.mouseL_last = False
-        self.mouseR_now = False
-        self.mouseR_lase = False
         pyxel.run(self.update, self.draw)
 
     def update(self):
         self.pointer.check(self.size_x, self.size_y, self.system_screen.h)
         self.system_screen.update_system()
-        self.mouseL_last = self.mouseL_now
-        self.mouseR_lase = self.mouseR_now
-        self.mouseL_now = pyxel.btn(pyxel.MOUSE_LEFT_BUTTON)
-        self.mouseR_now = pyxel.btn(pyxel.MOUSE_RIGHT_BUTTON)
-        if self.pointer.mouseL_last == False and self.pointer.mouseL_now == True:
+        if pyxel.btnp(pyxel.MOUSE_LEFT_BUTTON):
             self.lines.add_point(self.pointer)
-        if self.mouseR_lase == False and self.mouseR_now == True and len(self.lines.points)>=2:
+        if pyxel.btnp(pyxel.MOUSE_RIGHT_BUTTON) and len(self.lines.points) > 1:
             self.lines.active = False
             self.wall.add_lines(self.lines)
             self.lines = Lines(True)
@@ -85,18 +76,18 @@ class Pointer:
 class Lines:
     def __init__(self, close):
         self.close = close
-        self.points = np.array([])
+        self.points = []
         self.active = True
     
     def add_point(self, pointer):
         if len(self.points) == 0:
-            self.points = np.array([[pointer.x, pointer.y]]) 
+            self.points = [[pointer.x, pointer.y]] 
         elif len(self.points) == 1 and (self.points[-1][0] != pointer.x or self.points[-1][1] != pointer.y):
-            self.points = np.vstack([self.points, np.array([[pointer.x, pointer.y]])])
+            self.points.append([pointer.x, pointer.y])
         elif (len(self.points) >= 2 and 
             ((self.points[-1][0] != pointer.x or self.points[-1][1] != pointer.y)and
             (self.points[-2][0] != pointer.x or self.points[-2][1] != pointer.y))):
-            self.points = np.vstack([self.points, np.array([[pointer.x, pointer.y]])])
+            self.points.append([pointer.x, pointer.y])
         
     def draw_lines(self, pointer):
         """構成する全ての線の描画
@@ -125,7 +116,7 @@ class Wall:
     def add_lines(self, lines):
         # 点が２個だったら元々「閉じる」でも閉じなく設定し直す
         if len(lines.points) <= 2:
-            lines.close = False
+            lines.close = 0
         # 点と閉じる設定のリストを末尾に追加
         self.wall.append([lines.points, lines.close])
         # (描画用)線群のオブジェクトを末尾に追加
